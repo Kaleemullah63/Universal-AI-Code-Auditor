@@ -3,48 +3,78 @@ from groq import Groq
 import json
 from datetime import datetime
 
-# ---------------------- PAGE CONFIG ----------------------
+# ---------------------- CONFIG ----------------------
 st.set_page_config(
     page_title="OmniReview AI Code Auditor",
-    page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    page_icon="🤖"
 )
 
-# ---------------------- CUSTOM DARK UI ----------------------
+# ---------------------- MODERN UI CSS ----------------------
 st.markdown("""
 <style>
-.main {
-    background-color: #0e1117;
-    color: #ffffff;
+
+/* Background */
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #020617);
+    color: white;
 }
+
+/* Title */
+.title {
+    font-size: 42px;
+    font-weight: bold;
+    background: linear-gradient(90deg, #00ADB5, #3B82F6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Card */
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 20px;
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Text Area */
 textarea {
-    background-color: #1c1f26 !important;
-    color: #ffffff !important;
+    background-color: #020617 !important;
+    color: #fff !important;
     border-radius: 10px !important;
 }
+
+/* Button */
 .stButton button {
-    background: linear-gradient(90deg, #00ADB5, #007BFF);
+    width: 100%;
+    background: linear-gradient(90deg, #00ADB5, #3B82F6);
     color: white;
-    border-radius: 8px;
+    border-radius: 10px;
+    font-size: 16px;
     font-weight: bold;
 }
-.stMetric {
+
+/* Metric */
+.metric-box {
     text-align: center;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
 }
+
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------- GET API KEY FROM SECRETS ----------------------
-def get_api_key():
-    try:
-        return st.secrets["GROQ_API_KEY"]
-    except:
-        return None
-
-api_key = get_api_key()
+# ---------------------- API KEY (ONLY SECRETS) ----------------------
+try:
+    api_key = st.secrets["GROQ_API_KEY"]
+except:
+    st.error("❌ API key not found. Please add it in Streamlit secrets.")
+    st.stop()
 
 # ---------------------- SIDEBAR ----------------------
-st.sidebar.title("⚙️ Configuration")
+st.sidebar.markdown("## ⚙️ Configuration")
 
 depth = st.sidebar.select_slider(
     "Technical Depth",
@@ -52,55 +82,51 @@ depth = st.sidebar.select_slider(
     value="Advanced"
 )
 
-verbose = st.sidebar.toggle("Verbose Mode", value=True)
+verbose = st.sidebar.toggle("Verbose Mode", True)
 
-# Optional fallback (only if secret not found)
-if not api_key:
-    st.sidebar.warning("Using manual API key (Secrets not found)")
-    api_key = st.sidebar.text_input("Enter Groq API Key", type="password")
+# ---------------------- HEADER ----------------------
+st.markdown('<div class="title">🤖 OmniReview AI Code Auditor</div>', unsafe_allow_html=True)
+st.markdown("### Analyze • Debug • Optimize your code using AI")
 
-# ---------------------- MAIN UI ----------------------
-st.title("🤖 OmniReview: Universal AI Code Auditor")
-
-st.markdown("Analyze, debug, and optimize code using AI 🔥")
-
-col1, col2 = st.columns([2, 1])
+# ---------------------- MAIN LAYOUT ----------------------
+col1, col2 = st.columns([3, 1])
 
 with col1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
     code_input = st.text_area("📥 Paste Your Code", height=350)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
-    st.info("""
-💡 Features:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### 🚀 Features")
+    st.markdown("""
 - Multi-language support  
 - Bug detection  
-- Security audit  
+- Security analysis  
 - Code optimization  
-- Score system  
-""")
+- AI scoring system  
+    """)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 analyze_btn = st.button("🚀 Run AI Audit")
 
 # ---------------------- PROMPT ----------------------
 def build_prompt(code, depth, verbose):
     return f"""
-You are a Principal AI Code Auditor.
-
-Return ONLY valid JSON.
+Return ONLY JSON.
 
 Technical Depth: {depth}
 Verbose Mode: {verbose}
 
 Tasks:
-1. Detect language & purpose
-2. Find bugs (syntax, logic, security, performance)
-3. Explain each issue clearly
-4. Provide fixes
-5. Give score (0-100)
-6. Provide optimized code
+- Detect language & purpose
+- Find bugs
+- Explain issues
+- Give fixes
+- Score (0-100)
+- Provide optimized code
 
-JSON FORMAT:
-
+JSON:
 {{
   "language": "",
   "purpose": "",
@@ -122,69 +148,62 @@ CODE:
 {code}
 """
 
-# ---------------------- API CALL ----------------------
+# ---------------------- API ----------------------
 def analyze_code(api_key, prompt):
     client = Groq(api_key=api_key)
 
-    response = client.chat.completions.create(
+    res = client.chat.completions.create(
         model="llama-3.1-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2
     )
 
-    return response.choices[0].message.content
+    return res.choices[0].message.content
 
-# ---------------------- JSON PARSER ----------------------
-def parse_json(response):
+# ---------------------- PARSER ----------------------
+def parse_json(text):
     try:
-        start = response.find("{")
-        end = response.rfind("}") + 1
-        return json.loads(response[start:end])
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        return json.loads(text[start:end])
     except:
         return None
 
 # ---------------------- REPORT ----------------------
 def generate_report(data):
-    report = f"# OmniReview Report\n\n"
-    report += f"## Language\n{data.get('language')}\n\n"
-    report += f"## Purpose\n{data.get('purpose')}\n\n"
-    report += f"## Score\n{data.get('score')}%\n\n"
-    report += f"## Summary\n{data.get('summary')}\n\n"
+    return f"""
+# OmniReview Report
 
-    report += "## Issues\n"
-    for i in data.get("issues", []):
-        report += f"\n### {i.get('title')} ({i.get('severity')})\n"
-        report += f"- {i.get('explanation')}\n"
-        report += f"- Root Cause: {i.get('root_cause')}\n"
-        report += f"- Fix: {i.get('fix_steps')}\n"
+Language: {data.get('language')}
+Purpose: {data.get('purpose')}
+Score: {data.get('score')}%
 
-    report += "\n## Optimized Code\n```\n"
-    report += data.get("optimized_code", "")
-    report += "\n```"
+## Summary
+{data.get('summary')}
 
-    return report
+## Issues
+{json.dumps(data.get('issues'), indent=2)}
 
-# ---------------------- MAIN LOGIC ----------------------
+## Optimized Code
+{data.get('optimized_code')}
+"""
+
+# ---------------------- MAIN ----------------------
 if analyze_btn:
-    if not api_key:
-        st.error("❌ API key missing. Add it in Streamlit secrets.")
-    elif not code_input.strip():
-        st.warning("⚠️ Please paste your code first.")
+    if not code_input.strip():
+        st.warning("⚠️ Please enter code.")
     else:
         with st.spinner("🧠 AI is analyzing your code..."):
             try:
-                prompt = build_prompt(code_input, depth, verbose)
-                raw = analyze_code(api_key, prompt)
+                raw = analyze_code(api_key, build_prompt(code_input, depth, verbose))
                 data = parse_json(raw)
 
                 if not data:
-                    st.error("❌ Failed to parse response. Try again.")
+                    st.error("❌ Failed to parse response.")
                 else:
-                    tabs = st.tabs([
-                        "📄 Original Code",
-                        "🐞 Analysis",
-                        "✅ Optimized Code"
-                    ])
+                    st.markdown("---")
+
+                    tabs = st.tabs(["📄 Code", "🐞 Analysis", "✅ Optimized"])
 
                     # TAB 1
                     with tabs[0]:
@@ -192,13 +211,17 @@ if analyze_btn:
 
                     # TAB 2
                     with tabs[1]:
-                        st.metric("Code Quality Score", f"{data.get('score')}%")
+                        score = data.get("score", 0)
+
+                        st.markdown("### 📊 Code Quality Score")
+                        st.progress(score / 100)
+                        st.write(f"**{score}% Quality**")
 
                         for issue in data.get("issues", []):
                             with st.expander(f"{issue.get('title')} ({issue.get('severity')})"):
-                                st.write(f"**Explanation:** {issue.get('explanation')}")
-                                st.write(f"**Root Cause:** {issue.get('root_cause')}")
-                                st.write(f"**Fix:** {issue.get('fix_steps')}")
+                                st.write(issue.get("explanation"))
+                                st.write("**Root Cause:**", issue.get("root_cause"))
+                                st.write("**Fix:**", issue.get("fix_steps"))
 
                     # TAB 3
                     with tabs[2]:
@@ -210,14 +233,14 @@ if analyze_btn:
                             file_name="optimized_code.txt"
                         )
 
-                    # REPORT
+                    # DOWNLOAD REPORT
                     report = generate_report(data)
 
                     st.download_button(
-                        "📥 Download Full Report",
+                        "📥 Download Report",
                         report,
                         file_name=f"report_{datetime.now().strftime('%Y%m%d')}.md"
                     )
 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(str(e))
