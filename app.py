@@ -10,17 +10,16 @@ st.set_page_config(
     page_icon="🤖"
 )
 
-# ---------------------- MODERN UI CSS ----------------------
+# ---------------------- MODEL ----------------------
+MODEL_NAME = "llama-3.3-70b-versatile"
+
+# ---------------------- UI CSS ----------------------
 st.markdown("""
 <style>
-
-/* Background */
 .stApp {
     background: linear-gradient(135deg, #0f172a, #020617);
     color: white;
 }
-
-/* Title */
 .title {
     font-size: 42px;
     font-weight: bold;
@@ -28,49 +27,31 @@ st.markdown("""
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
-
-/* Card */
 .card {
     background: rgba(255,255,255,0.05);
     padding: 20px;
     border-radius: 15px;
     backdrop-filter: blur(10px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
 }
-
-/* Text Area */
 textarea {
     background-color: #020617 !important;
     color: #fff !important;
-    border-radius: 10px !important;
 }
-
-/* Button */
 .stButton button {
     width: 100%;
     background: linear-gradient(90deg, #00ADB5, #3B82F6);
     color: white;
     border-radius: 10px;
-    font-size: 16px;
     font-weight: bold;
 }
-
-/* Metric */
-.metric-box {
-    text-align: center;
-    padding: 10px;
-    background: rgba(255,255,255,0.05);
-    border-radius: 10px;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------- API KEY (ONLY SECRETS) ----------------------
+# ---------------------- GET API KEY ----------------------
 try:
     api_key = st.secrets["GROQ_API_KEY"]
 except:
-    st.error("❌ API key not found. Please add it in Streamlit secrets.")
+    st.error("❌ GROQ_API_KEY not found in Streamlit secrets.")
     st.stop()
 
 # ---------------------- SIDEBAR ----------------------
@@ -88,7 +69,7 @@ verbose = st.sidebar.toggle("Verbose Mode", True)
 st.markdown('<div class="title">🤖 OmniReview AI Code Auditor</div>', unsafe_allow_html=True)
 st.markdown("### Analyze • Debug • Optimize your code using AI")
 
-# ---------------------- MAIN LAYOUT ----------------------
+# ---------------------- LAYOUT ----------------------
 col1, col2 = st.columns([3, 1])
 
 with col1:
@@ -113,16 +94,16 @@ analyze_btn = st.button("🚀 Run AI Audit")
 # ---------------------- PROMPT ----------------------
 def build_prompt(code, depth, verbose):
     return f"""
-Return ONLY JSON.
+Return ONLY valid JSON.
 
 Technical Depth: {depth}
 Verbose Mode: {verbose}
 
 Tasks:
 - Detect language & purpose
-- Find bugs
-- Explain issues
-- Give fixes
+- Find bugs (syntax, logic, security, performance)
+- Explain each issue
+- Provide fixes
 - Score (0-100)
 - Provide optimized code
 
@@ -148,17 +129,17 @@ CODE:
 {code}
 """
 
-# ---------------------- API ----------------------
-def analyze_code(api_key, prompt):
+# ---------------------- API CALL ----------------------
+def analyze_code(prompt):
     client = Groq(api_key=api_key)
 
-    res = client.chat.completions.create(
-        model="llama-3.1-70b-versatile",
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2
     )
 
-    return res.choices[0].message.content
+    return response.choices[0].message.content
 
 # ---------------------- PARSER ----------------------
 def parse_json(text):
@@ -191,15 +172,15 @@ Score: {data.get('score')}%
 # ---------------------- MAIN ----------------------
 if analyze_btn:
     if not code_input.strip():
-        st.warning("⚠️ Please enter code.")
+        st.warning("⚠️ Please paste your code.")
     else:
         with st.spinner("🧠 AI is analyzing your code..."):
             try:
-                raw = analyze_code(api_key, build_prompt(code_input, depth, verbose))
+                raw = analyze_code(build_prompt(code_input, depth, verbose))
                 data = parse_json(raw)
 
                 if not data:
-                    st.error("❌ Failed to parse response.")
+                    st.error("❌ Failed to parse response. Try again.")
                 else:
                     st.markdown("---")
 
@@ -243,4 +224,4 @@ if analyze_btn:
                     )
 
             except Exception as e:
-                st.error(str(e))
+                st.error(f"❌ Error: {str(e)}")
